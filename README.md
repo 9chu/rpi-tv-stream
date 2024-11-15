@@ -145,14 +145,22 @@
     ```bash
     #!/bin/bash
 
+    function run_stream() {
+        ffmpeg -hide_banner -loglevel warning -f alsa -ac 2 -thread_queue_size 256 -i 'hw:CARD=MS210x,DEV=0' \
+            -f v4l2 -input_format mjpeg -video_size 720x480 -framerate 25 -thread_queue_size 64 -i /dev/video0 \
+            -pix_fmt yuv420p -vf "tpad=start_duration=0.5 [delay]; [delay] scale=960:540 [out]" \
+            -vcodec h264_v4l2m2m -quality realtime -g 50 -q:v 2 -b:v 5000k \
+            -c:a aac -b:a 128k -ar 44100 \
+            -f flv rtmp://192.168.1.1:1935/tv
+    }
+
     sleep 5
 
-    ffmpeg -hide_banner -loglevel warning -f alsa -ac 2 -i 'hw:CARD=MS210x,DEV=0' \
-        -f v4l2 -input_format mjpeg -video_size 720x480 -framerate 25 -thread_queue_size 32 -i /dev/video0 \
-        -pix_fmt yuv420p -vf "tpad=start_duration=0.5 [delay]; [delay] scale=960:540 [out]" \
-        -vcodec h264_v4l2m2m -quality realtime -g 50 -q:v 2 -b:v 5000k \
-        -c:a aac -b:a 128k -ar 44100 \
-        -f flv rtmp://192.168.1.1:1935/tv
+    echo "Warm up"
+    run_stream & sleep 5; pkill ffmpeg
+
+    echo "Start streaming"
+    run_stream
     ```
 
 3. 使用 PM2 启动服务
