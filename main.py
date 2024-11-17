@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 import subprocess
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -31,16 +32,31 @@ class KeyArgs(BaseModel):
 
 
 app = FastAPI()
+logger = logging.getLogger("uvicorn.error")
 
 
 @app.post("/key")
 async def key(args: KeyArgs):
     scancode = CODE_MAPPING.get(args.key, None)
     if scancode is not None:
-        proc = subprocess.run(["ir-ctl", "-d", "/dev/lirc0", "--scancode", scancode], stdout=subprocess.PIPE, 
+        cmd = ["ir-ctl", "-d", "/dev/lirc0", "--scancode", scancode]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, 
                               stderr=subprocess.PIPE)
+        logger.info(f"call {' '.join(cmd)}, retcode: {proc.returncode}, stdout: {proc.stdout.decode('utf-8')}, " + \
+                    f"stderr: {proc.stderr.decode('utf-8')}")
         if proc.returncode == 0:
             return { "code": 0 }
         return { "code": -2 }
     else:
         return { "code": -1 }
+
+
+@app.post("/restart")
+async def restart():
+    cmd = ["pm2", "restart", "tv-live-stream"]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    logger.info(f"call {' '.join(cmd)}, retcode: {proc.returncode}, stdout: {proc.stdout.decode('utf-8')}, " + \
+                f"stderr: {proc.stderr.decode('utf-8')}")
+    if proc.returncode == 0:
+        return { "code": 0 }
+    return { "code": -2 }
