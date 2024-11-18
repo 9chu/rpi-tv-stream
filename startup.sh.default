@@ -1,0 +1,9 @@
+#!/bin/bash
+
+export RC_PORT="rc0"
+export RTMP_URL="rtmp://localhost"
+export CONTROL_URL="http://localhost:10001"
+
+cd "$(dirname $0)"
+source venv/bin/activate
+python client.py

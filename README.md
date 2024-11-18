@@ -1,8 +1,10 @@
 # 树莓派电视信号转 RTMP & 远程遥控器控制
 
-## 电视信号转 RTMP
+## 服务端
 
-### 前置准备
+### 电视信号转 RTMP
+
+#### 前置准备
 
 1. 使用 USB 采集卡采集信号
 2. 检查视频捕获设备
@@ -125,7 +127,7 @@
     }
     ```
 
-### 启动服务
+#### 启动服务
 
 1. 安装 PM2 进行进程管理并配置开机自启
 
@@ -170,9 +172,9 @@
     pm2 save
     ```
 
-## 红外遥控器模拟
+### 红外遥控器模拟
 
-### 前置准备
+#### 前置准备
 
 1. 在树莓派 GPIO 18 插入接收端，17 插入发送端
 2. 配置 `/boot/firmware/config.txt`，在最后加入
@@ -229,7 +231,7 @@
 
 7. 使用 evtest 测试并记录各个按键的红外信号，并修改`main.py`
 
-### 启动进程
+#### 启动进程
 
 1. 使用 pm2 启动进程
 
@@ -238,3 +240,55 @@
     ```
 
 2. 去除红外接收端，去除 config.txt 中的 dtoverlay
+
+## 客户端
+
+### 红外配置
+
+    编译`ir-enable-all-protocol`。
+
+    ```bash
+    gcc ir-enable-all-protocol.c -o ir-enable-all-protocol
+    sudo cp ir-enable-all-protocol /usr/local/bin/ir-enable-all-protocol
+    ```
+
+    通过`visudo`修改命令配置。
+
+    ```bash
+    EDITOR=vim sudo -E visudo
+    ```
+
+    加入：
+
+    ```bash
+    pi ALL=NOPASSWD:/usr/local/bin/ir-enable-all-protocol
+    ```
+
+    注意这里用户名为`pi`，根据需要进行调整。
+
+### 准备 pip 环境
+
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
+
+### 设置开机自动启动
+
+    根据需要修改下述脚本并执行：
+
+    ```bash
+    cp startup.sh.default startup.sh
+    chmod +x startup.sh
+    vim startup.sh # 根据需要修改 startup.sh
+    mkdir -p ~/.config/autostart
+    cat <<EOF > ~/.config/autostart/RPiTvStreamClient.desktop
+    [Desktop Entry]
+    Type=Application
+    Name=RPiTvStreamClient
+    Exec=/where_this_project_stores/startup.sh
+    EOF
+    ```
+
+    重启即可。
