@@ -9,6 +9,7 @@ import subprocess
 import evdev
 import requests
 from selectors import DefaultSelector, EVENT_READ
+from screeninfo import get_monitors
 
 
 class MaxLevelFilter(logging.Filter):
@@ -177,6 +178,19 @@ def handle_ir_button(key, control_url):
         logging.exception("Send message to backend fail")
 
 
+def change_resolution(device, target):
+    logging.info(f"Change resolution to {target}. device {device}")
+    subprocess.run(["xrandr", "--output", device, "--mode", target], stdin=subprocess.PIPE, stdout=sys.stdout,
+        stderr=sys.stderr)
+
+
+def get_current_resolution():
+    monitors = get_monitors()
+    if len(monitors) == 0:
+        return None, None
+    return monitors[0].name, (monitors[0].width, monitors[0].height)
+
+
 def main():
     rc_port = os.environ.get("RC_PORT", "rc0")
     rtmp_url = os.environ.get("RTMP_URL", "rtmp://localhost")
@@ -189,12 +203,14 @@ def main():
                                  stdout=sys.stdout, stderr=sys.stderr)
     if ir_proc_ret.returncode != 0:
         logging.warning("Open IR protocol fail")
-    
+
     # 启动 ffplay 并保持运行
     thread = FFPlayThread(rtmp_url)
     thread.start()
 
     try:
+        last_monitor_update_at = time.perf_counter()
+
         # 等待红外输入
         input_device = next(pathlib.Path(f"/sys/class/rc/{rc_port}/").glob("input*/event*/"), None)
         if input_device is None:
@@ -214,7 +230,17 @@ def main():
                     device = key.fileobj
                     for event in device.read():
                         process.handle_input(event)
+
+                now = time.perf_counter()
                 process.update()
+                if now - last_monitor_update_at > 5:
+                    last_monitor_update_at = now
+                    try:
+                        device, resolution = get_current_resolution()
+                        if device is not None and resolution[0] != 1280 and resolution[1] != 720:
+                            change_resolution(device, "1280x720")
+                    except Exception as ex:
+                        logging.exception("Failed to monitor screen resolution")
     except KeyboardInterrupt as e:
         pass
     
